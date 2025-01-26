@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <title>Simulador de Nodos con Leaflet (Múltiples segmentos)</title>
+    <title>Logistics Simulator</title>
     <!-- CSS de Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <!-- Estilos del proyecto -->
@@ -20,11 +20,14 @@
       <button id="limpiarTodoButton">Limpiar Todo</button>
       <button id="empezarProduccionButton">Empezar Producción</button>
       <button id="detenerProduccionButton">Detener Producción</button>
+      
       <button id="descargarAlmacenesButton">Descargar Almacenes</button>
       <!-- Exportar/Importar -->
       <button id="exportButton">Exportar Estado</button>
       <button id="importButton">Importar Estado</button>
       <input type="file" id="importFileInput" style="display: none" />
+      <!-- controles de vistas -->
+      <button id="mostrarCaminosButton">Mostrar Caminos</button>
       <!-- Estadisticas globales -->
       <div id="estadisticas">
         <h3>Estadísticas</h3>

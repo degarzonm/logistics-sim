@@ -2,10 +2,11 @@
  * VARIABLES GLOBALES
  ****************************************************/
 //Game variables
+let mundo = {tema:{mapa:"dark_all", texto:"#555555" }};
 let gameSpeed = 1;
 let gamePaused = false;
 let money = 1000;
-let score = 0;
+let puntaje = 0;
 let gameStarted = false;
 let gameEnded = false;
 let team_id = 1;
@@ -33,7 +34,11 @@ let detenerProduccionButton;
 let descargarAlmacenesButton;
 let exportButton;
 let importButton;
+let mostrarCaminosButton;
 let importFileInput;
+
+//controles de visibilidad
+let mostrarCaminosFlag = true;
 
 // Configuraciones de conexiones permitidas
 const allowedConnections = {
@@ -69,11 +74,10 @@ window.addEventListener("load", () => {
   };
   // Inicializar el mapa
   map = L.map("map").setView([4.626907913301086, -74.1755128361618], 17);
+  estilo = "https://{s}.basemaps.cartocdn.com/rastertiles/"+mundo.tema.mapa+"/{z}/{x}/{y}{r}.png"; 
+  // "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
   L.tileLayer(
-    //estilo de mapa voyager sin etiquetas
-    //"https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png",
-    //estilo de mapa oscuro
-    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    estilo,
     {
       maxZoom: 20,
       attribution: "© CartoDB, © OpenStreetMap",
@@ -107,6 +111,7 @@ window.addEventListener("load", () => {
   exportButton = document.getElementById("exportButton");
   importButton = document.getElementById("importButton");
   importFileInput = document.getElementById("importFileInput");
+  mostrarCaminosButton = document.getElementById("mostrarCaminosButton");
 
   // Asignar eventos a los botones
   createCaminoButton.addEventListener("click", crearCaminos);
@@ -130,6 +135,9 @@ window.addEventListener("load", () => {
   exportButton.addEventListener("click", exportState);
   importButton.addEventListener("click", () => importFileInput.click());
   importFileInput.addEventListener("change", handleImportFile);
+
+  // Mostrar Caminos 
+  mostrarCaminosButton.addEventListener("click", mostrarCaminos);
 
   // Clic derecho en el mapa => crear nodo
   map.on("contextmenu", (e) => {
@@ -189,6 +197,7 @@ function drawLoop() {
   // Solicitar el siguiente frame
   requestAnimationFrame(drawLoop);
 }
+
 function actualizaEstadisticas() {
   document.getElementById("estadisticaDinero").innerText = `Dinero: $${money}`;
 }
@@ -203,4 +212,8 @@ function limpiarTodo() {
   nodes = [];
   nodeLayer.addNodes(nodes); // Actualizar la capa de nodos
   actualizaPanelControl();
+}
+
+function mostrarCaminos() {
+  mostrarCaminosFlag = !mostrarCaminosFlag;
 }

@@ -1,39 +1,70 @@
-function actualizaPanelControl() {
-  let ctn = document.getElementById("control-panels-container");
-  if (!ctn) return;
 
-  // Verificar si algún input dentro del contenedor está enfocado
-  let enFoco = ctn.querySelector(
-    "input:focus, select:focus, textarea:focus"
-  );
-  if (enFoco) {
-    // Si hay un input enfocado, no actualizar el panel para evitar perder el foco
-    return;
+
+function actualizaPanelControl() {
+  if (!window.nodePanels) {
+    window.nodePanels = {};
   }
 
-  // Limpiar el contenido actual del panel
-  ctn.innerHTML = "";
+  nodes.forEach((nd) => {
+    let nodeId = nd._id;
+    let panelEl = window.nodePanels[nodeId];
+    let isSelectedVisible = nd.selected && estaEnPantalla(nd);
 
-  // Obtener los nodos seleccionados
-  let sel = nodes.filter((n) => n.selected);
-  sel.forEach((nd) => {
-    let div = document.createElement("div");
-    div.classList.add("control-panel");
+    if (isSelectedVisible) {
+      // Crear panel si no existe
+      if (!panelEl) {
+        panelEl = document.createElement("div");
+        panelEl.classList.add("node-control-panel");
+        document.body.appendChild(panelEl);
+        window.nodePanels[nodeId] = panelEl;
 
-    // Información básica del nodo
-    div.innerHTML = `
-        <h4>${nd.type}</h4>
-        <p>Inventario: ${JSON.stringify(nd.inventory)}</p>
-        <p>Lat: ${nd.lat.toFixed(3)}, Lng: ${nd.lng.toFixed(3)}</p>
-      `;
+        // Construye el contenido la primera vez
+        buildPanelContent(panelEl, nd);
+        
+        // Guardamos el tipo inicial para saber si debemos reconstruir
+        nd._lastType = nd.type;
+      }
+      else {
+        // Si el nodo cambió de tipo, reconstruye su contenido
+        if (nd.type !== nd._lastType) {
+          // Vacía y vuelve a crear
+          panelEl.innerHTML = "";
+          buildPanelContent(panelEl, nd);
+          nd._lastType = nd.type;
+        }
+        // Caso contrario, mantenemos el contenido (no perdemos foco).
+      }
 
-    // Añadir los controles dinámicos según el tipo de nodo
-    const controlsDiv = creaControlesNodo(nd);
-    div.appendChild(controlsDiv);
-
-    // Agregar el panel completo al contenedor principal
-    ctn.appendChild(div);
+      // Reposicionar y mostrar
+      let point = map.latLngToContainerPoint([nd.lat, nd.lng]);
+      panelEl.style.left = (point.x + 10) + "px";
+      panelEl.style.top  = (point.y + 10) + "px";
+      panelEl.classList.remove("hidden");
+    } 
+    else {
+      // Si no está seleccionado o no está en pantalla => ocultamos
+      if (panelEl) {
+        panelEl.classList.add("hidden");
+      }
+    }
   });
+}
+
+// buildPanelContent() es simplemente la lógica que tenías en creaControlesNodo()
+function buildPanelContent(panelEl, node) {
+  // Título
+  const title = document.createElement("h4");
+  title.textContent = node.type;
+  panelEl.appendChild(title);
+
+  // Crea el div con los controles específicos
+  let controlsDiv = creaControlesNodo(node);
+  panelEl.appendChild(controlsDiv);
+}
+
+// Función simple para verificar si el nodo está en la vista actual:
+function estaEnPantalla(nodo) {
+  return map.getBounds().contains([nodo.lat, nodo.lng]);
 }
 
 function creaControlesNodo(node) {
@@ -77,25 +108,30 @@ function creaControlesNodo(node) {
 function creaFuenteControl(node) {
   const div = document.createElement("div");
 
-  
-
-  // 1. Input para item_gen
+  // 1. Menú desplegable para item_gen
   const labelItemGen = document.createElement("label");
   labelItemGen.textContent = "Genera:";
-  const inputItemGen = document.createElement("input");
-  inputItemGen.type = "text";
-  inputItemGen.value = node.item_gen;
-  inputItemGen.style.marginRight = "10px";
+  const selectItemGen = document.createElement("select");
+  selectItemGen.style.marginRight = "10px";
 
-  // Actualizar el nodo al cambiar el valor
-  inputItemGen.addEventListener("change", () => {
-    node.item_gen = inputItemGen.value;
-    node.precio_venta = Math.floor(tiposRecurso[inputItemGen.value].precio*0.7);
-    // Opcional: Actualizar el panel si es necesario
-    // updateControlPanels();
+  // Poblar el menú con los tipos de recurso
+  Object.keys(tiposRecurso).forEach((tipo) => {
+    const option = document.createElement("option");
+    option.value = tipo;
+    option.textContent = tipo;
+    if (node.item_gen === tipo) {
+      option.selected = true;
+    }
+    selectItemGen.appendChild(option);
   });
 
-  labelItemGen.appendChild(inputItemGen);
+  // Actualizar el nodo al cambiar el valor
+  selectItemGen.addEventListener("change", () => {
+    node.item_gen = selectItemGen.value;
+    node.precio_venta = Math.floor(tiposRecurso[selectItemGen.value].precio * 0.7);
+  });
+
+  labelItemGen.appendChild(selectItemGen);
   div.appendChild(labelItemGen);
 
   // 2. Input para productionInterval
@@ -104,14 +140,12 @@ function creaFuenteControl(node) {
   labelInterval.style.display = "block"; // Para que se muestre debajo
   const inputInterval = document.createElement("input");
   inputInterval.type = "number";
-  inputInterval.value = node.productionInterval/1000;
+  inputInterval.value = node.productionInterval / 1000;
   inputInterval.min = "0.0001";
 
   // Actualizar el nodo al cambiar el valor
   inputInterval.addEventListener("change", () => {
-    node.productionInterval = parseInt(inputInterval.value*1000);
-    // Opcional: Actualizar el panel si es necesario
-    // updateControlPanels();
+    node.productionInterval = parseInt(inputInterval.value * 1000);
   });
 
   labelInterval.appendChild(inputInterval);
@@ -127,47 +161,67 @@ function creaTransformadorControl(node) {
   title.textContent = "Controles de transformador";
   div.appendChild(title);
 
-  // 1. Entrada
+  // 1. Menú desplegable para entry_item
   const labelEntry = document.createElement("label");
   labelEntry.textContent = "Receta: ";
-  const inputEntry = document.createElement("input");
-  inputEntry.type = "text";
-  inputEntry.value = node.entry_item;
-  inputEntry.style.marginRight = "10px";
+  const selectEntry = document.createElement("select");
+  selectEntry.style.marginRight = "10px";
 
-  inputEntry.addEventListener("change", () => {
-    node.entry_item = inputEntry.value;
+  // Poblar el menú con los tipos de recurso
+  Object.keys(tiposRecurso).forEach((tipo) => {
+    const option = document.createElement("option");
+    option.value = tipo;
+    option.textContent = tipo;
+    if (node.entry_item === tipo) {
+      option.selected = true;
+    }
+    selectEntry.appendChild(option);
   });
 
-  labelEntry.appendChild(inputEntry);
+  // Actualizar el nodo al cambiar el valor
+  selectEntry.addEventListener("change", () => {
+    node.entry_item = selectEntry.value;
+  });
+
+  labelEntry.appendChild(selectEntry);
   div.appendChild(labelEntry);
 
-  // 2. Salida
+  // 2. Menú desplegable para transformed_item
   const labelOutput = document.createElement("label");
   labelOutput.textContent = "Genera: ";
   labelOutput.style.display = "block";
-  const inputOutput = document.createElement("input");
-  inputOutput.type = "text";
-  inputOutput.value = node.transformed_item;
+  const selectOutput = document.createElement("select");
 
-  inputOutput.addEventListener("change", () => {
-    node.transformed_item = inputOutput.value;
+  // Poblar el menú con los tipos de recurso
+  Object.keys(tiposRecurso).forEach((tipo) => {
+    const option = document.createElement("option");
+    option.value = tipo;
+    option.textContent = tipo;
+    if (node.transformed_item === tipo) {
+      option.selected = true;
+    }
+    selectOutput.appendChild(option);
   });
 
-  labelOutput.appendChild(inputOutput);
+  // Actualizar el nodo al cambiar el valor
+  selectOutput.addEventListener("change", () => {
+    node.transformed_item = selectOutput.value;
+  });
+
+  labelOutput.appendChild(selectOutput);
   div.appendChild(labelOutput);
 
-  // 3. Tiempo de transformación
+  // 3. Input para tiempo de transformación
   const labelTime = document.createElement("label");
   labelTime.textContent = "Tiempo de transformación (s): ";
   labelTime.style.display = "block";
   const inputTime = document.createElement("input");
   inputTime.type = "number";
-  inputTime.value = node.t_transform/1000;
+  inputTime.value = node.t_transform / 1000;
   inputTime.min = "1";
 
   inputTime.addEventListener("change", () => {
-    node.t_transform = parseInt(inputTime.value*1000);
+    node.t_transform = parseInt(inputTime.value * 1000);
   });
 
   labelTime.appendChild(inputTime);

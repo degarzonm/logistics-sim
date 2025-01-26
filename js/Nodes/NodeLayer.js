@@ -86,6 +86,9 @@ class CapaNodos extends L.Layer {
     this.nodos.forEach((node) => {
       this._dibujaNodo(node);
     });
+
+    //reposiciona los paneles de control
+    //actualizaPanelControl();
   }
 
   // Método para dibujar un único nodo
@@ -120,7 +123,8 @@ class CapaNodos extends L.Layer {
 
     // Dibujar el texto del inventario
     this.ctx.font = `${Math.round(12 * scaleFactor)}px Arial`;
-    this.ctx.fillStyle = "#FFFFFF";
+    this.ctx.fillStyle = mundo.tema.texto;
+    //this.ctx.fillStyle = world.tema.texto;
     this.ctx.textAlign = "center";
     this.ctx.fillText(
       Object.keys(nodo.inventory)
@@ -157,58 +161,55 @@ class CapaNodos extends L.Layer {
     let canvasWidth = this.canvas.width;
     let canvasHeight = this.canvas.height;
 
-    // Ajustamos un radio base para los activators
     let activatorBaseRadius = 7;
     let activatorRadius = activatorBaseRadius * scaleFactor;
     if (activatorRadius < 5) activatorRadius = 5;
 
-    // Recorremos todos los paths del nodo
     node.paths.forEach((p) => {
-      // Determinar si este nodo es "A" o "B" en ese path
-      let other = null;
-      let isNodeA = false;
-      if (p.nodeA === node) {
-        isNodeA = true;
-        other = p.nodeB;
-      } else {
-        other = p.nodeA;
-      }
+        // Verificar que el path y su polyline existan
+        if (!p || !p.view || !p.view.polyline) return;
 
-      // Tomar la polyline del path y obtener la "tercera parte" de los puntos
-      // En este ejemplo: tomaremos latlng intermedio = polyline latlngs [ 1/3 ]
-      let latlngs = p.polyline.getLatLngs();
-      if (!latlngs || latlngs.length === 0) return;
+        let other = null;
+        let isNodeA = false;
+        if (p.nodeA === node) {
+            isNodeA = true;
+            other = p.nodeB;
+        } else {
+            other = p.nodeA;
+        }
 
-      let midIndex = Math.floor(isNodeA ? 8*latlngs.length / 9 : 1*latlngs.length / 9);
-      let midLatLng = latlngs[midIndex]; 
+        // Obtener los puntos de la polyline de manera segura
+        let latlngs = p.view.polyline.getLatLngs();
+        if (!latlngs || latlngs.length === 0) return;
 
-      // Convertir a punto en pantalla
-      let midPoint = this.map.latLngToContainerPoint(midLatLng);
+        let midIndex = Math.floor(isNodeA ? 8*latlngs.length / 9 : 1*latlngs.length / 9);
+        let midLatLng = latlngs[midIndex];
 
-      // Si está fuera de la pantalla, clamp al borde + 30 px
-      let clampedX = Math.max(30, Math.min(midPoint.x, canvasWidth - 30));
-      let clampedY = Math.max(30, Math.min(midPoint.y, canvasHeight - 30));
-      // Color: si isNodeA => p.activeAtoB, si no => p.activeBtoA
-      let isActive = isNodeA ? p.activeAtoB : p.activeBtoA;
-      let color = isActive ? "limegreen" : "red";
+        // Convertir a punto en pantalla
+        let midPoint = this.map.latLngToContainerPoint(midLatLng);
 
-      // Dibujar el círculo
-      this.ctx.beginPath();
-      this.ctx.arc(clampedX, clampedY, activatorRadius, 0, Math.PI * 2);
-      this.ctx.fillStyle = color;
-      this.ctx.fill();
-      this.ctx.closePath();
+        // Si está fuera de la pantalla, clamp al borde + 30 px
+        let clampedX = Math.max(30, Math.min(midPoint.x, canvasWidth - 30));
+        let clampedY = Math.max(30, Math.min(midPoint.y, canvasHeight - 30));
+        // Color: si isNodeA => p.activeAtoB, si no => p.activeBtoA
+        let isActive = isNodeA ? p.activeAtoB : p.activeBtoA;
+        let color = isActive ? "limegreen" : "red";
 
-      // Guardar info en pathActivators
-      this.activadoresRutas.push(new ActivadorDeCamino(node, p,
-        isNodeA,
-        clampedX, clampedY,
-        activatorRadius));
+        // Dibujar el círculo
+        this.ctx.beginPath();
+        this.ctx.arc(clampedX, clampedY, activatorRadius, 0, Math.PI * 2);
+        this.ctx.fillStyle = color;
+        this.ctx.fill();
+        this.ctx.closePath();
+
+        // Guardar info en pathActivators
+        this.activadoresRutas.push(new ActivadorDeCamino(node, p,
+          isNodeA,
+          clampedX, clampedY,
+          activatorRadius));
     });
   }
 
-  // Obtener el color del nodo basado en su tipo
-  
 
   // Manejo de eventos de clic
   _onClick(e) {
@@ -216,14 +217,13 @@ class CapaNodos extends L.Layer {
     let x = e.clientX - rect.left;
     let y = e.clientY - rect.top;
 
-    // ***** MODIFICACIÓN:
     // Primero, detectamos si se ha hecho click sobre un pathActivator
     for (let activ of this.activadoresRutas) {
        
       
       if (activ.dentro(x, y)) {
         
-        // Toggle la dirección de la ruta, sin deseleccionar
+        // Toggle la activación de la ruta, sin deseleccionar
         activ.activarRuta();
         // Forzamos un redibujado
         this.draw();
@@ -296,10 +296,7 @@ class CapaNodos extends L.Layer {
 
     if (!nodeClicked) {
       // Enable map dragging since no node was clicked
-      this.map.dragging.enable();
-
-      // Optionally, deselect all nodes when clicking outside
-      
+      this.map.dragging.enable();      
       this.draw();
       actualizaPanelControl();
     }
@@ -343,13 +340,14 @@ class CapaNodos extends L.Layer {
         let paths = this.arrastreNodo.paths;
         const debouncedUpdate = debounce(() => {
           paths.forEach((p) => {
-            p.updatePolyline();
-
+            p.fetchRouteAndBuildSegments();
           });
         }, 300);
 
         // Llamar a la función debounced
         debouncedUpdate();
+        this.draw();
+        actualizaPanelControl();
       }
       this.arrastreNodo = null;
       this.dragOffset = { x: 0, y: 0 };

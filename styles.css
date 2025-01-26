@@ -3,6 +3,7 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
+  font-family: sans-serif;
 }
 
 /* El mapa ocupará todo el fondo */
@@ -30,22 +31,42 @@ html, body {
   margin: 5px 0;
 }
 
-/* Panel de control, en la esquina superior izquierda */
-#control-panels-container {
+/* Panel de control para los nodos */
+
+.node-control-panel {
   position: absolute;
-  top: 10px;
-  left: 50px;
-  z-index: 998;
-  max-width: 220px;
-}
-
-.control-panel {
-  background-color: rgba(200, 200, 200, 0.9);
-  margin-bottom: 10px;
+  background-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.2);
   padding: 10px;
-  border-radius: 16px;
+  border-radius: 8px;
+  z-index: 9999;   /* por encima de otras capas */
+  min-width: 120px;
+  pointer-events: auto; /* para que pueda interactuarse */
+  transition: opacity 0.2s ease-in-out;
 }
 
+.node-control-panel.hidden {
+  display: none;
+}
+
+.node-control-panel h4 {
+  margin: 0 0 6px 0;
+  font-size: 14px;
+}
+
+.node-control-panel label {
+  display: block;
+  font-size: 12px;
+  margin: 4px 0 2px;
+}
+
+.node-control-panel input {
+  width: 60px;
+  padding: 2px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-family: Calibri, sans-serif;
+}
 /* Estilo para la capa de partículas Canvas */
 .particle-layer {
   position: absolute;

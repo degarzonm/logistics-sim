@@ -1,5 +1,11 @@
 // Teclas para cambiar tipo de nodos
 window.addEventListener("keydown", (e) => {
+
+  const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
+  if (tag === "input" || tag === "textarea" || tag === "select") {
+    return; // Ignora los atajos de teclado
+  }
+
   let sel = nodes.filter((n) => n.selected);
   //if (sel.length === 0) return;
   switch (e.key.toLowerCase()) {

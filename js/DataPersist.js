@@ -19,7 +19,7 @@ function exportState() {
     productionActive: productionActive,
     productionInterval: productionInterval,
     money: money,
-    score: score,
+    puntaje: puntaje,
     gameSpeed: gameSpeed,
     // ... Agrega aquí otras variables globales que quieras persistir
   };
@@ -158,7 +158,7 @@ async function importState(data) {
     productionActive = data.globalState.productionActive || false;
     productionInterval = data.globalState.productionInterval || 2000;
     money = data.globalState.money || 0;
-    score = data.globalState.score || 0;
+    puntaje = data.globalState.puntaje || 0;
     gameSpeed = data.globalState.gameSpeed || 1;
     // Agregar aquí cualquier otra variable que hayas decidido persistir
   }

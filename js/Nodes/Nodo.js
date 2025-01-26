@@ -3,6 +3,7 @@
  *  - Representa un nodo en el simulador.
  ****************************************************/
 class Node {
+  static nextId = 1;
   constructor(
     lat,
     lng,
@@ -13,6 +14,7 @@ class Node {
     entry_item = "A",
     transformed_item = "B"
   ) {
+    this._id = Node.nextId++;
     this.lat = lat;
     this.lng = lng;
     this.type = type;
