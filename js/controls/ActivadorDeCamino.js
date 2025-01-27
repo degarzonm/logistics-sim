@@ -1,18 +1,17 @@
 class ActivadorDeCamino {
-  constructor(node, ruta, esNodoA, x, y, radio) {
+  constructor(node, ruta, x, y, radio) {
     this.nodo = node;
     this.ruta = ruta;
-    this.esNodoA = esNodoA;
     this.x = x;
     this.y = y;
     this.radio = radio;
   }
   activarRuta() {
-    if (this.esNodoA) {
-      this.ruta.activeAtoB = !this.ruta.activeAtoB;
-    } else {
-      this.ruta.activeBtoA = !this.ruta.activeBtoA;
-    }
+    console.log(this.nodo);
+    console.log(this.ruta);
+    let ruta = this.nodo.rutas.find((r) => r.ruta._id == this.ruta._id);
+    console.log("Activando ruta", ruta);
+    ruta.activa = !ruta.activa;
   }
 
   dentro(x, y) {

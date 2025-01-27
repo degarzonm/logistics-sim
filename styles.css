@@ -68,7 +68,7 @@ html, body {
   font-family: Calibri, sans-serif;
 }
 /* Estilo para la capa de partículas Canvas */
-.particle-layer {
+.vehiculos-layer {
   position: absolute;
   top: 0;
   left: 0;

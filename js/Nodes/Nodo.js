@@ -22,10 +22,12 @@ class Node {
 
     // ====== Propiedades de producción y transformación ======
     //item gen: item generado por la fuente, aleatorio entre los tipos de recurso disponibles
-    let rand_index = Math.floor(Math.random() * Object.keys(tiposRecurso).length);
+    let rand_index = Math.floor(
+      Math.random() * Object.keys(tiposRecurso).length
+    );
     this.item_gen = Object.keys(tiposRecurso)[rand_index];
     //si es fuente define un precio de venta para su recurso generado
-    this.precio_venta = Math.floor(tiposRecurso[this.item_gen].precio*0.7);
+    this.precio_venta = Math.floor(tiposRecurso[this.item_gen].precio * 0.7);
 
     this.t_transform = t_transform;
     this.entry_item = entry_item;
@@ -35,7 +37,11 @@ class Node {
     this.productionInterval = 2000;
 
     this.inventory = {};
+    this.nodosConectados = [];
     this.paths = [];
+    // en mejora a rutas : {ruta, nodo, activa}
+    this.rutas = [];
+    this.flota = [];
     this.selected = false;
 
     // Producción y transformación
@@ -47,28 +53,61 @@ class Node {
     this.factorAtencionClientes = 1; // factor de atención a clientes (1 = normal) , 1.4 atenderá 40% más rápido
     // Estructura para clientes en atención
     this.clientesAtendiendo = [];
-    
+
     if (this.type === "tienda") {
       this.areaInfluencia = new AreaInfluencia(this);
     }
   }
 
   // Cambiar el tipo de nodo
-  changeType(newType) {
-    this.type = newType;
-    // Actualizar direcciones activas en los paths conectados
+  actualizaTipo(nuevoTipo) {
+    this.type = nuevoTipo;
+
     if (this.type === "tienda") {
       this.areaInfluencia = new AreaInfluencia(this);
     }
     if (this.type === "fuente") {
-      this.precio_venta = Math.floor(tiposRecurso[this.item_gen].precio*0.7);
+      this.precio_venta = Math.floor(
+        tiposRecurso[this.item_gen].precio * mundo.factorVentaFuente
+      );
+
+      this.flota = [];
+      //agrega 5 motos a la flota
+      for (let i = 0; i < 5; i++) {
+        let moto = new Vehiculo();
+        this.flota.push(moto);
+        flotaGlobal.push(moto);
+      }
     }
-    this.paths.forEach((p) => p.updateActiveDirections());
+    this.rutas.forEach((r) => {
+      r.ruta.activa = allowedConnections[this.type].includes(r.nodo.type);
+    });
+  }
+
+  agregaRuta( nodo) {
+    let nuevaRuta = new Path({lat: this.lat,lng: this.lng}, {lat: nodo.lat,lng: nodo.lng});
+      
+    paths.push(nuevaRuta);
+
+    this.rutas.push({ ruta: nuevaRuta,nodo: nodo, activa: allowedConnections[this.type].includes(nodo.type) });
+  }
+
+  remueveRuta(nodoB) {
+    if (!nodoB) return;
+    let ruta = this.rutas.find((r) => r.nodo._id === nodoB._id);
+    if (!ruta) return;
+
+    this.rutas = this.rutas.filter((r) => r.nodo._id !== nodoB._id);
+
+    // Remove the path from the global paths array
+    paths = paths.filter((p) => p._id !== ruta._id);
+  
+    // Remove the path from the map
+    ruta.ruta.view.removeFromMap();
   }
 
   // Añadir recurso al inventario
   addResource(resourceType) {
-    if (this.type === "fuente") return;
     if (this.type === "sumidero") {
       // Consumir sin almacenar
       return;
@@ -100,7 +139,7 @@ class Node {
   }
 
   // Remover un recurso específico del inventario
-  removeResource(rType, cantidad = 1) {
+  consumeRecurso(rType, cantidad = 1) {
     if (!this.inventory[rType]) return null;
     this.inventory[rType] -= cantidad;
     if (this.inventory[rType] <= 0) {
@@ -124,7 +163,9 @@ class Node {
   }
   // Producción de recursos
   produceResource() {
-    if (money < this.precio_venta) return;
+    //se debe modificar, ahora la fuente produce y almacena recursos, solo cuando se hace un despacho se envía el recurso
+    //se reduce el inventario y se decrementa el dinero global
+    /*if (money < this.precio_venta) return;
     let salientes = this.paths.filter(
       (p) =>
         (p.nodeA === this && p.activeAtoB) || (p.nodeB === this && p.activeBtoA)
@@ -133,14 +174,15 @@ class Node {
       path.send(this, this.item_gen);
       //reduce el dinero global
       money -= this.precio_venta;
-    });
+    });*/
+    this.inventory[this.item_gen] = (this.inventory[this.item_gen] || 0) + 1;
   }
 
   // Iniciar transformación de recursos
-  startTransformation() {
+  iniciaTransformacion() {
     if (this.type !== "transformador") return;
-    let cant = this.inventory[this.entry_item] || 0;
-    if (!this.isProcessing && cant > 0) {
+    let cantidad = this.inventory[this.entry_item] || 0;
+    if (!this.isProcessing && cantidad > 0) {
       this.isProcessing = true;
       this.lastTransformTime = Date.now();
     }
@@ -149,45 +191,52 @@ class Node {
   // Actualizar estado de transformación
   updateTransformation() {
     if (this.type !== "transformador") return;
-    if ((this.inventory[this.transformed_item] || 0) > 0) {
+    //se intenta enviar el recurso transformado si hay inventario presente en el nodo
+    /*if ((this.inventory[this.transformed_item] || 0) > 0) {
       this.sendTransformedItem();
       return;
-    }
+    }*/
+
     if (this.isProcessing) {
-      let now = Date.now();
+      // si el tiempo de transformación ha terminado se intenta guardar el recurso transformado
       if (now - this.lastTransformTime >= this.t_transform) {
-        this.removeResource(this.entry_item);
+        // Consumir el recurso de entrada
+        this.consumeRecurso(this.entry_item);
         if (this.transformed_item) {
+          // Almacenar el recurso transformado
           this.inventory[this.transformed_item] =
             (this.inventory[this.transformed_item] || 0) + 1;
         }
-        this.sendTransformedItem();
+        // Reiniciar el proceso
         this.isProcessing = false;
+        //this.sendTransformedItem();//el transformador ya no envía el recurso transformado inmediatamente
       }
     } else {
-      this.startTransformation();
+      // Si no está procesando, intentar iniciar la transformación
+      this.iniciaTransformacion();
     }
   }
 
+  //ahora los recursos transformados no se nvían inmediatamente, se envían cuando se solicita un despacho
   // Enviar el recurso transformado a un path saliente
-  sendTransformedItem() {
-    let salientes = this.paths.filter(
+  /*sendTransformedItem() {
+    let rutasSalientes = this.paths.filter(
       (p) =>
         (p.nodeA === this && p.activeAtoB) || (p.nodeB === this && p.activeBtoA)
     );
     let count = this.inventory[this.transformed_item] || 0;
-    if (salientes.length > 0 && count > 0) {
-      let chosen = salientes[Math.floor(Math.random() * salientes.length)];
-      this.removeResource(this.transformed_item);
-      chosen.send(this, this.transformed_item);
+    if (rutasSalientes.length > 0 && count > 0) {
+      let rand_index = Math.floor(Math.random() * rutasSalientes.length);
+      let chosen = rutasSalientes[rand_index];
+      this.consumeRecurso(this.transformed_item);
+      chosen.send(this, this.transformed_item);//todo cambiar a despacharVehiculo con la carga del recurso
     }
-  }
+  }*/
 
   // Actualizar estado del nodo
   updateNode() {
     // Si es una fuente y la producción está activa
     if (this.type === "fuente" && productionActive) {
-      let now = Date.now();
       if (now - this.lastProductionTime >= this.productionInterval) {
         this.produceResource();
         this.lastProductionTime = now;
@@ -213,49 +262,51 @@ class Node {
   }
 
   _buscarNuevosClientes() {
-       // Capacidad disponible
-       let disponible = this.capacidadAtencion - this.clientesAtendiendo.length;
-       if (disponible <= 0) return;
-    
-       // Buscar clientes NO atendidos que estén en la lista global "clientes"
-       // y que estén dentro del área de influencia
-       let pendientes = clientes.filter(c => !c.atendido && c.tiempoEnEspera < c.tiempoEsperaMax);
-       for (let c of pendientes) {
-         if (this._estaEnAreaInfluencia(c.lat, c.lng)) {
-           // Revisar si ya lo estamos atendiendo
-           let existe = this.clientesAtendiendo.find((obj) => obj.cliente === c);
-           if (!existe && this.clientesAtendiendo.length < this.capacidadAtencion) {
-             // Intentar solicitar
-             let ok = c.solicitarAtencion(this, this.factorAtencionClientes);
-             if (ok) {
-               this.clientesAtendiendo.push({ cliente: c });
-             }
-           }
-         }
-       }
-     }
-  
-     _estaEnAreaInfluencia(lat, lng) {
-       if (!this.areaInfluencia) return false;
-       let dist = L.latLng(this.lat, this.lng).distanceTo([lat, lng]);
-       return dist <= this.areaInfluencia.r;
-     }
-  
-     /**
-      * Este método es llamado cuando el cliente se finaliza en otra tienda y
-      * queremos liberar la atención local sin consumir inventario.
-      */
-     abortarAtencion(cliente) {
-       for (let i = this.clientesAtendiendo.length - 1; i >= 0; i--) {
-         if (this.clientesAtendiendo[i].cliente === cliente) {
-           this.clientesAtendiendo.splice(i, 1);
-           break;
-         }
-       }
-     }
-  
+    // Capacidad disponible
+    let disponible = this.capacidadAtencion - this.clientesAtendiendo.length;
+    if (disponible <= 0) return;
 
-  
+    // Buscar clientes NO atendidos que estén en la lista global "clientes"
+    // y que estén dentro del área de influencia
+    let pendientes = clientes.filter(
+      (c) => !c.atendido && c.tiempoEnEspera < c.tiempoEsperaMax
+    );
+    for (let c of pendientes) {
+      if (this._estaEnAreaInfluencia(c.lat, c.lng)) {
+        // Revisar si ya lo estamos atendiendo
+        let existe = this.clientesAtendiendo.find((obj) => obj.cliente === c);
+        if (
+          !existe &&
+          this.clientesAtendiendo.length < this.capacidadAtencion
+        ) {
+          // Intentar solicitar
+          let ok = c.solicitarAtencion(this, this.factorAtencionClientes);
+          if (ok) {
+            this.clientesAtendiendo.push({ cliente: c });
+          }
+        }
+      }
+    }
+  }
+
+  _estaEnAreaInfluencia(lat, lng) {
+    if (!this.areaInfluencia) return false;
+    let dist = L.latLng(this.lat, this.lng).distanceTo([lat, lng]);
+    return dist <= this.areaInfluencia.r;
+  }
+
+  /**
+   * Este método es llamado cuando el cliente se finaliza en otra tienda y
+   * queremos liberar la atención local sin consumir inventario.
+   */
+  abortarAtencion(cliente) {
+    for (let i = this.clientesAtendiendo.length - 1; i >= 0; i--) {
+      if (this.clientesAtendiendo[i].cliente === cliente) {
+        this.clientesAtendiendo.splice(i, 1);
+        break;
+      }
+    }
+  }
 }
 
 /****************************************************
@@ -263,11 +314,6 @@ class Node {
  ****************************************************/
 
 function crearNodo(lat, lng) {
-  // Deselect all nodes if no shift key
-  if (!event.shiftKey) {
-    nodes.forEach((n) => (n.selected = false));
-  }
-
   let newN = new Node(lat, lng, "fuente");
   nodes.push(newN);
   nodeLayer.addNodes(nodes); // Actualizar la capa de nodos
@@ -303,38 +349,18 @@ function descargarAlmacenes() {
     });
   });
 }
- 
-function remueveRuta(nodo, ruta) {
-  if (!nodo || !ruta) return;
 
-  // Remove the path from both nodes' paths arrays
-  if (nodo === ruta.nodeA || nodo === ruta.nodeB) {
-    nodo.paths = nodo.paths.filter((p) => p !== ruta);
-    if (ruta.nodeA !== nodo) {
-      ruta.nodeA.paths = ruta.nodeA.paths.filter((p) => p !== ruta);
-    }
-    if (ruta.nodeB !== nodo) {
-      ruta.nodeB.paths = ruta.nodeB.paths.filter((p) => p !== ruta);
-    }
-  }
-
-  // Remove the path from the global paths array
-  paths = paths.filter((p) => p !== ruta);
-
-  // Remove the path from the map
-  ruta.removeFromMap();
-}
 
 function removerNodo(nodo) {
   let index = nodes.indexOf(nodo);
   if (index === -1) return;
 
-  // Remove all paths associated with this node
-  let removedPaths = [];
-  for (let i = 0; i < nodo.paths.length; i++) {
-    removedPaths.push(nodo.paths[i]);
-  }
-  removedPaths.forEach((p) => remueveRuta(nodo, p));
+
+  //remueve rutas
+  nodes.forEach((n) => {
+    if(n._id !== nodo._id) n.remueveRuta(nodo);
+  } 
+  );
 
   // Remove the node from the nodes array
   nodes.splice(index, 1);
@@ -362,3 +388,5 @@ function getNodeColor(node) {
       return "gray";
   }
 }
+
+function despacharVehiculo() {}

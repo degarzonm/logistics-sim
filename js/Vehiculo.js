@@ -1,18 +1,24 @@
 /****************************************************
  * CLASE PARTICLE
- *  Recorre los segments del Path en orden,
+ *  Recorre los segmentos del Path en orden,
  *  calculando tiempos parciales en cada tramo.
  ****************************************************/
 class Vehiculo {
-    constructor(ruta, tiempoInicio, tipoRecurso = "A", orientacion = "AB") {
+    constructor(tipo = "moto", coords = [], ruta, tiempoInicio, pedido, orientacion = "AB") {
+      //asigna un id aleatorio al vehículo.
+      this.id = Math.random().toString(36).substring(2, 15);
+      this.tipo = tipo; // "moto", "van", "camion"
+      this.capacidad = 0;
+      this.velocidad = 0; // km/h
+      this._definirPropiedadesPorTipo();
       this.ruta = ruta;
       this.tInicio = tiempoInicio;
-      this.tipoRec = tipoRecurso;
+      this.pedido = pedido;
       this.orientacion = orientacion;
       this.finalizaRuta = false;
       this.inventario = {};
       // Preparar los segmentos de acuerdo con la dirección
-      let segmentos = this.ruta.segments;
+      let segmentos = this.ruta.segmentos;
       let segmentosFinal;
       if (this.orientacion === "AB") {
         // Se usan los segmentos tal cual están (A->B)
@@ -44,17 +50,69 @@ class Vehiculo {
       });
   
       // Posición actual de la partícula
-      this.coordsActual = this.segmentos.length > 0
-        ? [this.segmentos[0].lat1, this.segmentos[0].lng1]
-        : null;
+      this.coordsActual = coords;
+    }
+
+    _definirPropiedadesPorTipo() {
+      // Según el tipo, asignamos capacidad y velocidad
+      switch (this.tipo) {
+        case "moto":
+          this.capacidad = 5;
+          this.velocidad = 80; // km/h por ejemplo
+          break;
+        case "van":
+          this.capacidad = 30;
+          this.velocidad = 50;
+          break;
+        case "camion":
+          this.capacidad = 150;
+          this.velocidad = 30;
+          break;
+      }
     }
   
     // Obtener la posición actual de la partícula
     latLngActual() {
-      if (this.finalizaRuta) return null;
       return this.coordsActual;
     }
   
+    async definirRuta(latDestino, lngDestino) {
+      // Llamada a OSRM con: lat/lng actual => latDestino,lngDestino
+      let url = `https://router.project-osrm.org/route/v1/driving/` +
+                `${this.lng},${this.lat};${lngDestino},${latDestino}?` +
+                `overview=full&geometries=geojson`;
+      try {
+        let resp = await fetch(url);
+        let data = await resp.json();
+        if (data && data.routes && data.routes.length > 0) {
+          let coords = data.routes[0].geometry.coordinates; // [ [lng, lat], ... ]
+          this.segmentos = [];
+          this.tiemposSegmento = [];
+          this.rutaCompletaMs = 0;
+    
+          // Crear Segmentos
+          for (let i = 0; i < coords.length - 1; i++) {
+            let c1 = coords[i];
+            let c2 = coords[i+1];
+            let seg = new Segment(
+              c1[1], c1[0], // lat1, lng1
+              c2[1], c2[0], // lat2, lng2
+              this.velocidad // speedKmh
+            );
+            this.segmentos.push(seg);
+            this.tiemposSegmento.push(seg.travelTimeMs);
+            this.rutaCompletaMs += seg.travelTimeMs;
+          }
+          this.enMovimiento = true;
+          this.finishedRoute = false;
+          this.tInicio = Date.now();
+        }
+      } catch(e) {
+        console.error("Error definindo ruta para vehiculo:", e);
+      }
+    }
+
+
     // Actualizar la posición basada en el tiempo transcurrido
     actualizaPosicion(tTranscurrido) {
       if (this.finalizaRuta) return;
@@ -62,7 +120,7 @@ class Vehiculo {
       // Determinar en cuál segmento estamos, según 'elapsed'
       let tFaltante = tTranscurrido;
       let indexSegActual = 0;
-      while (indexSegActual < this.segmentos.length) {
+      while (indexSegActual < this.path.segmentos.length) {
         let dur = this.tiempoSegmentos[indexSegActual];
         if (tFaltante <= dur) {
           // Estamos en este segmento
@@ -76,7 +134,7 @@ class Vehiculo {
       // Si ya recorrimos todos los segmentos, marcar como finalizado
       if (indexSegActual >= this.segmentos.length) {
         this.finalizaRuta = true;
-        this.coordsActual = null;
+        
         return;
       }
   
@@ -85,6 +143,7 @@ class Vehiculo {
       let segT = tFaltante / this.tiempoSegmentos[indexSegActual];
   
       let [lat, lng] = seg.getLatLngAt(segT);
+      //actualiza la posición del vehículo en el mapa 
       this.coordsActual = [lat, lng];
     }
   
@@ -98,4 +157,4 @@ class Vehiculo {
     }
 
     
-  }
+}

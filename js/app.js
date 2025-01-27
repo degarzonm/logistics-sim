@@ -2,9 +2,19 @@
  * VARIABLES GLOBALES
  ****************************************************/
 //Game variables
-let mundo = {tema:{mapa:"dark_all", texto:"#555555" }};
+let mundo = {
+  tema: {
+    tema_mapa: "dark_all",
+    color_vehiculos: "#FCD144",
+    color_caminos: "#FFFFFF",
+  },
+  mapa: { centro: [4.626907913301086, -74.1755128361618], zoom: 17 },
+  vehiculos: [],
+  factorVentaFuente: 0.7,
+};
 let gameSpeed = 1;
 let gamePaused = false;
+let now = Date.now();
 let money = 1000;
 let puntaje = 0;
 let gameStarted = false;
@@ -15,12 +25,13 @@ let team_color = "#3fb0c4";
 //Map variables
 let map; // Instancia Leaflet
 let nodes = [];
+let flotaGlobal = [];
 let paths = [];
-let particles = [];
+//let particles = []; // en proceso de actualizar vehiculos en vez de partículas
 let clientes = [];
 
 // Capas Canvas
-let particleLayer; // capa para vehiculos
+let vehiculosLayer; // capa para vehiculos
 let nodeLayer; // capa para nodos
 let clienteLayer; // capa para clientes
 
@@ -73,28 +84,34 @@ window.addEventListener("load", () => {
     E: new Recurso("E", 100, 4, "#00aaaa"),
   };
   // Inicializar el mapa
-  map = L.map("map").setView([4.626907913301086, -74.1755128361618], 17);
-  estilo = "https://{s}.basemaps.cartocdn.com/rastertiles/"+mundo.tema.mapa+"/{z}/{x}/{y}{r}.png"; 
-  // "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-  L.tileLayer(
-    estilo,
-    {
-      maxZoom: 20,
-      attribution: "© CartoDB, © OpenStreetMap",
-    }
-  ).addTo(map);
+  map = L.map("map").setView(mundo.mapa.centro, mundo.mapa.zoom);
+  estilo =
+    "https://{s}.basemaps.cartocdn.com/rastertiles/" +
+    mundo.tema.tema_mapa +
+    "/{z}/{x}/{y}{r}.png";
+  L.tileLayer(estilo, {
+    maxZoom: 20,
+    attribution: "© CartoDB, © OpenStreetMap",
+  }).addTo(map);
 
-  // Crear la capa de partículas y añadirla al mapa
-  particleLayer = new ParticleLayer();
-  map.addLayer(particleLayer);
+  // Crear la capa de vehiculos y añadirla al mapa
+  vehiculosLayer = new VehiculoLayer();
+  map.addLayer(vehiculosLayer);
 
-  // Crear la capa de nodos yañadirla al mapa
+  // Crear la capa de nodos y añadirla al mapa
   nodeLayer = new CapaNodos();
   map.addLayer(nodeLayer);
 
   // Crear la capa de clientes y añadirla al mapa
   clienteLayer = new ClienteLayer();
   map.addLayer(clienteLayer);
+  // crea mundo.vehiculos y añade una moto al jugador
+  /*let motoInicial = new Vehiculo(
+    "moto",
+    map.getCenter().lat,
+    map.getCenter().lng
+  );
+  mundo.vehiculos.push(motoInicial);*/
 
   // Botones
   createCaminoButton = document.getElementById("createCaminoButton");
@@ -114,17 +131,20 @@ window.addEventListener("load", () => {
   mostrarCaminosButton = document.getElementById("mostrarCaminosButton");
 
   // Asignar eventos a los botones
-  createCaminoButton.addEventListener("click", crearCaminos);
+  createCaminoButton.addEventListener("click", crearCaminosNodosSeleccionados);
   distribuirButton.addEventListener("click", iniciarDistribucion);
   limpiarCaminoSeleccionadoButton.addEventListener(
     "click",
     limpiarCaminoSeleccionado
   );
   limpiarTodoButton.addEventListener("click", limpiarTodo);
-  empezarProduccionButton.addEventListener(
-    "click",
-    () => (productionActive = true)
-  );
+  empezarProduccionButton.addEventListener("click", () => {
+    productionActive = !productionActive;
+    //modifica el texto del botón
+    empezarProduccionButton.innerText = productionActive
+      ? "Detener Producción"
+      : "Empezar Producción";
+  });
   detenerProduccionButton.addEventListener(
     "click",
     () => (productionActive = false)
@@ -136,12 +156,24 @@ window.addEventListener("load", () => {
   importButton.addEventListener("click", () => importFileInput.click());
   importFileInput.addEventListener("change", handleImportFile);
 
-  // Mostrar Caminos 
+  // Mostrar Caminos
   mostrarCaminosButton.addEventListener("click", mostrarCaminos);
 
   // Clic derecho en el mapa => crear nodo
   map.on("contextmenu", (e) => {
     crearNodo(e.latlng.lat, e.latlng.lng);
+  });
+  //ctrl + click en el mapa => mover moto inicial a la posición del click
+  map.on("click", (e) => {
+    if (e.originalEvent.ctrlKey) {
+      // Si presionamos Ctrl mientras hacemos clic en el mapa,
+      // movemos la moto inicial (o cualquier vehículo que queramos).
+      // Podrías buscar la primera moto de mundo.vehiculos, o un vehículo concreto.
+      if (mundo.vehiculos.length > 0) {
+        let veh = mundo.vehiculos[0]; // Por simplicidad, la primera moto
+        veh.definirRuta(e.latlng.lat, e.latlng.lng);
+      }
+    }
   });
 
   // Iniciar el loop de dibujo
@@ -157,6 +189,7 @@ window.addEventListener("load", () => {
  * FUNCIÓN PRINCIPAL DE DIBUJO (LOOP)
  ****************************************************/
 function drawLoop() {
+  now = Date.now();
   //Actualizar estadisticas globales
   actualizaEstadisticas();
   // Actualizar nodos
@@ -164,36 +197,55 @@ function drawLoop() {
   // Actualizar clientes
   clientes.forEach((c) => c.updateCliente());
   // Actualizar posiciones de partículas basadas en el tiempo transcurrido
-  let currentTime = Date.now();
 
+  /*
+  // en proceso de actualizar vehiculos en vez de partículas
   particles.forEach((pt) => {
     let elapsed = currentTime - pt.tInicio;
 
     pt.actualizaPosicion(elapsed);
+  });*/
+  // ***** Actualizar vehículos GLOBALES
+
+  mundo.vehiculos.forEach((veh) => {
+    veh.actualizarPosicion(now);
+    // Si llegó a destino y tenemos lógica adicional, se manejaría aquí
   });
 
-  // Dibujar nodos en la capa Canvas
-  nodeLayer.addNodes(nodes);
-
-  // Dibujar partículas en la capa Canvas
-  particleLayer.addParticles(particles);
-
-  // Dibujar clientes en la capa Canvas
-  clienteLayer.addClientes(clientes);
-
-  // Procesar partículas finalizadas
-  let ended = particles.filter((pt) => pt.rutaCompletada());
-  ended.forEach((pt) => {
-    let endNode = pt.getNodoFinal();
-    if (endNode) {
-      endNode.addResource(pt.tipoRec);
-    }
+  // ***** Recolectar también vehículos de cada nodo y actualizarlos
+  // (Opcional: solo si un nodo puede mover sus vehículos en el mapa)
+  nodes.forEach((node) => {
+    node.flota.forEach((veh) => {
+      veh.actualizarPosicion(now);
+      // Manejar llegada de ruta, descarga, retorno, etc.
+      if (veh.finishedRoute && !veh.enRetorno && veh.destinoNode) {
+        // Ejemplo de descarga
+        let cargamento = veh.descargarTodo();
+        for (let tipo in cargamento) {
+          veh.destinoNode.inventory[tipo] =
+            (veh.destinoNode.inventory[tipo] || 0) + cargamento[tipo];
+        }
+        // Preparar retorno:
+        veh.definirRuta(veh.origenNode.lat, veh.origenNode.lng);
+        veh.enRetorno = true;
+      } else if (veh.finishedRoute && veh.enRetorno) {
+        // El vehículo ya regresó, lo estacionamos
+        // Ejemplo:
+        veh.lat = node.lat;
+        veh.lng = node.lng;
+        // Reseteamos flags
+        veh.enMovimiento = false;
+        veh.enRetorno = false;
+      }
+    });
   });
-  // Eliminar partículas que han terminado su recorrido
-  particles = particles.filter((pt) => !pt.rutaCompletada());
 
-  //Eliminar clientes atendidos
+  // Dibujar todos los vehículos en la capa vehicleLayer
+  vehiculosLayer.draw();
+
+  // Procesar clientes ya atendidos
   clientes = clientes.filter((c) => !c.atendido);
+
   // Solicitar el siguiente frame
   requestAnimationFrame(drawLoop);
 }
@@ -206,10 +258,15 @@ function actualizaEstadisticas() {
  ****************************************************/
 
 function limpiarTodo() {
-  particles = [];
-  paths.forEach((p) => p.removeFromMap());
+  // ***** particles = []; (Se elimina)
+  // paths.forEach((p) => p.removeFromMap());
+  paths.forEach((p) => p.view.removeFromMap());
   paths = [];
   nodes = [];
+
+  // ***** Limpiar flota global
+  flotaGlobal = [];
+
   nodeLayer.addNodes(nodes); // Actualizar la capa de nodos
   actualizaPanelControl();
 }

@@ -10,7 +10,7 @@ window.addEventListener("keydown", (e) => {
   //if (sel.length === 0) return;
   switch (e.key.toLowerCase()) {
     case "c":
-      crearCaminos();
+      crearCaminosNodosSeleccionados();
       break;
     case "d":
       iniciarDistribucion();
@@ -30,22 +30,22 @@ window.addEventListener("keydown", (e) => {
       break;
 
     case "f":
-      sel.forEach((n) => n.changeType("fuente"));
+      sel.forEach((n) => n.actualizaTipo("fuente"));
       break;
     case "s":
-      sel.forEach((n) => n.changeType("sumidero"));
+      sel.forEach((n) => n.actualizaTipo("sumidero"));
       break;
     case "a":
-      sel.forEach((n) => n.changeType("almacen"));
+      sel.forEach((n) => n.actualizaTipo("almacen"));
       break;
     case "t":
-      sel.forEach((n) => n.changeType("transformador"));
+      sel.forEach((n) => n.actualizaTipo("transformador"));
       break;
     case "x":
       sel.forEach((n) => removerNodo(n));
       break;
     case "y":
-      sel.forEach((n) => n.changeType("tienda"));
+      sel.forEach((n) => n.actualizaTipo("tienda"));
       break;
     default:
       break;

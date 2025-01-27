@@ -82,7 +82,7 @@ function exportState() {
       activeAtoB: p.activeAtoB,
       activeBtoA: p.activeBtoA,
       // Guardamos todos los segmentos para no depender de recalcular OSRM
-      segments: p.segments.map((s) => ({
+      segmentos: p.segmentos.map((s) => ({
         lat1: s.lat1,
         lng1: s.lng1,
         lat2: s.lat2,
@@ -221,14 +221,14 @@ async function importState(data) {
       p.activeBtoA = pd.activeBtoA;
 
       // Reconstruir los segmentos sin necesidad de llamar a OSRM
-      p.segments = pd.segments.map((s) => {
+      p.segmentos = pd.segmentos.map((s) => {
         let seg = new Segment(s.lat1, s.lng1, s.lat2, s.lng2, s.speedKmh);
         return seg;
       });
 
       // Redibujar la polyline
       let latlngs = [];
-      p.segments.forEach((seg) => {
+      p.segmentos.forEach((seg) => {
         if (latlngs.length === 0) {
           latlngs.push([seg.lat1, seg.lng1]);
         }

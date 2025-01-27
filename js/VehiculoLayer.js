@@ -2,7 +2,7 @@
  * CLASE PARTICLELAYER
  *  Capa personalizada de Leaflet para dibujar partículas en Canvas.
  ****************************************************/
-class ParticleLayer extends L.Layer {
+class VehiculoLayer extends L.Layer {
     constructor() {
       super();
       this.particles = [];
@@ -52,23 +52,19 @@ class ParticleLayer extends L.Layer {
       this.draw();
     }
   
-    // Actualizar las partículas a dibujar
-    addParticles(particles) {
-      
-      this.particles = particles;
-      this.draw();
-    }
+    // Actualizar los vehículos a dibujar
+    
   
-    // Dibujar todas las partículas en el Canvas
+    // Dibujar todos los vehículos en el Canvas
     draw() {
       if (!this.ctx) return;
   
       // Limpiar el Canvas
       this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
       
-      // Dibujar cada partícula
-      this.particles.forEach((pt) => {
-        this.display(pt);
+      // Dibujar cada vehículo
+      mundo.vehiculos.forEach((veh) => {
+        this.display(veh);
       });
     }
 
@@ -89,7 +85,7 @@ class ParticleLayer extends L.Layer {
 
         this.ctx.beginPath();
         this.ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
-        this.ctx.fillStyle = tiposRecurso[vehiculo.tipoRec].color || "#fff";
+        this.ctx.fillStyle = mundo.tema.color_vehiculos || "#fff";
         this.ctx.fill();
         this.ctx.closePath();
     }

@@ -165,24 +165,15 @@ class CapaNodos extends L.Layer {
     let activatorRadius = activatorBaseRadius * scaleFactor;
     if (activatorRadius < 5) activatorRadius = 5;
 
-    node.paths.forEach((p) => {
-        // Verificar que el path y su polyline existan
-        if (!p || !p.view || !p.view.polyline) return;
-
-        let other = null;
-        let isNodeA = false;
-        if (p.nodeA === node) {
-            isNodeA = true;
-            other = p.nodeB;
-        } else {
-            other = p.nodeA;
-        }
+    node.rutas.forEach((p) => {
+        // Verificar que la ruta y su polyline existan
+        if (!p || !p.ruta.view || !p.ruta.view.polyline) return;
 
         // Obtener los puntos de la polyline de manera segura
-        let latlngs = p.view.polyline.getLatLngs();
+        let latlngs = p.ruta.view.polyline.getLatLngs();
         if (!latlngs || latlngs.length === 0) return;
 
-        let midIndex = Math.floor(isNodeA ? 8*latlngs.length / 9 : 1*latlngs.length / 9);
+        let midIndex = Math.floor( 8*latlngs.length / 9 );
         let midLatLng = latlngs[midIndex];
 
         // Convertir a punto en pantalla
@@ -192,8 +183,8 @@ class CapaNodos extends L.Layer {
         let clampedX = Math.max(30, Math.min(midPoint.x, canvasWidth - 30));
         let clampedY = Math.max(30, Math.min(midPoint.y, canvasHeight - 30));
         // Color: si isNodeA => p.activeAtoB, si no => p.activeBtoA
-        let isActive = isNodeA ? p.activeAtoB : p.activeBtoA;
-        let color = isActive ? "limegreen" : "red";
+       
+        let color = p.activa ? "limegreen" : "red";
 
         // Dibujar el círculo
         this.ctx.beginPath();
@@ -203,8 +194,7 @@ class CapaNodos extends L.Layer {
         this.ctx.closePath();
 
         // Guardar info en pathActivators
-        this.activadoresRutas.push(new ActivadorDeCamino(node, p,
-          isNodeA,
+        this.activadoresRutas.push(new ActivadorDeCamino(node, p.ruta,
           clampedX, clampedY,
           activatorRadius));
     });
@@ -325,8 +315,8 @@ class CapaNodos extends L.Layer {
 
       // Redraw the canvas
       this.draw();
-      if (particleLayer && typeof particleLayer.draw === "function") {
-        particleLayer.draw();
+      if (vehiculosLayer && typeof vehiculosLayer.draw === "function") {
+        vehiculosLayer.draw();
       }
       actualizaPanelControl();
     }
@@ -334,16 +324,25 @@ class CapaNodos extends L.Layer {
 
   _onMouseUp(e) {
     if (this.arrastreNodo) {
+      //console.log(this.arrastreNodo);
       if (this.dragOffsetTotal.x > 15000 || this.dragOffsetTotal.y > 15000) {
-    
+        
+        // Almacenar una referencia al nodo arrastrado
+        const nodoArrastrado = this.arrastreNodo;
+  
         // Crear una función debounced compartida
-        let paths = this.arrastreNodo.paths;
         const debouncedUpdate = debounce(() => {
-          paths.forEach((p) => {
-            p.fetchRouteAndBuildSegments();
+          console.log(nodoArrastrado);
+          nodoArrastrado.rutas.forEach((r) => {
+            //para cada ruta, se eliminan y crean de nuevo los segmentos
+            nodoArrastrado.remueveRuta(r.nodo);
+            r.nodo.remueveRuta(nodoArrastrado);
+  
+            nodoArrastrado.agregaRuta(r.nodo);
+            r.nodo.agregaRuta(nodoArrastrado);
           });
         }, 300);
-
+  
         // Llamar a la función debounced
         debouncedUpdate();
         this.draw();
@@ -352,7 +351,7 @@ class CapaNodos extends L.Layer {
       this.arrastreNodo = null;
       this.dragOffset = { x: 0, y: 0 };
       this.dragOffsetTotal = { x: 0, y: 0 };
-
+  
       // Rehabilitar el arrastre del mapa después de mover el nodo
       this.map.dragging.enable();
     }
