@@ -200,6 +200,30 @@ class CapaNodos extends L.Layer {
     });
   }
 
+  pickPathActivator(x, y) {
+    for (let activ of this.activadoresRutas) {
+      if (activ.dentro(x, y)) {
+        return activ; // ActivadorDeCamino
+      }
+    }
+    return null;
+  }
+
+  pickNodeAtCoord(x, y) {
+    for (let node of this.nodos) {
+      let scaleFactor = 1 + (this.map.getZoom() - 15) * 0.15;
+      if (scaleFactor < 0.2) scaleFactor = 0.2;
+      if (scaleFactor > 5) scaleFactor = 5;
+      let finalRadius = node.size * scaleFactor;
+  
+      let point = this.map.latLngToContainerPoint([node.lat, node.lng]);
+      let dist = Math.hypot(point.x - x, point.y - y);
+      if (dist <= finalRadius) {
+        return node;
+      }
+    }
+    return null;
+  }
 
   // Manejo de eventos de clic
   _onClick(e) {
@@ -255,6 +279,8 @@ class CapaNodos extends L.Layer {
       this.draw();
       actualizaPanelControl();
     }
+
+    vehiculosLayer._onClick(e);
   }
 
   // Manejo de eventos de arrastre
@@ -356,4 +382,10 @@ class CapaNodos extends L.Layer {
       this.map.dragging.enable();
     }
   }
+}
+
+function deseleccionarNodos() {
+  nodes.forEach((n) => (n.selected = false));
+  nodeLayer.draw();
+  actualizaPanelControl();
 }

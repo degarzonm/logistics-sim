@@ -21,7 +21,6 @@ function exportState() {
     money: money,
     puntaje: puntaje,
     gameSpeed: gameSpeed,
-    // ... Agrega aquí otras variables globales que quieras persistir
   };
 
   // --- (B) Serializar nodos ---
@@ -30,6 +29,7 @@ function exportState() {
   let serializedNodes = nodes.map((n) => {
     // Empaquetamos las propiedades básicas
     let nodeData = {
+      _id : n._id,
       lat: n.lat,
       lng: n.lng,
       type: n.type,
@@ -41,6 +41,7 @@ function exportState() {
       transformed_item: n.transformed_item,
       productionInterval: n.productionInterval,
       inventory: { ...n.inventory }, // clonamos el inventario
+      flota : n.flota,
       lastProductionTime: n.lastProductionTime,
       lastTransformTime: n.lastTransformTime,
       isProcessing: n.isProcessing,
@@ -57,6 +58,13 @@ function exportState() {
         lastGenTime: n.areaInfluencia.lastGenTime
       };
     }
+    // Guardamos las rutas de este nodo
+    nodeData.rutas = n.rutas.map((ruta) => {
+      let idxNodo = ruta.nodo._id;
+      return {
+        nodoId: idxNodo
+      };
+    });
 
     // También guardamos la lista de clientes que el nodo está atendiendo
     // En Node, "clientesAtendiendo" es un array de objetos { cliente }
@@ -69,28 +77,6 @@ function exportState() {
     return nodeData;
   });
 
-  // --- (C) Serializar paths ---
-  //   Cada path se identifica por sus dos nodos (se guardan los índices),
-  //   flags de dirección y sus segmentos.
-  let serializedPaths = paths.map((p) => {
-    let idxA = nodes.indexOf(p.nodeA);
-    let idxB = nodes.indexOf(p.nodeB);
-
-    return {
-      nodeAindex: idxA,
-      nodeBindex: idxB,
-      activeAtoB: p.activeAtoB,
-      activeBtoA: p.activeBtoA,
-      // Guardamos todos los segmentos para no depender de recalcular OSRM
-      segmentos: p.segmentos.map((s) => ({
-        lat1: s.lat1,
-        lng1: s.lng1,
-        lat2: s.lat2,
-        lng2: s.lng2,
-        speedKmh: s.speedKmh
-      }))
-    };
-  });
 
   // --- (D) Serializar clientes ---
   //   Cada cliente tendrá sus datos y referencias a nodos o tiendas que lo atendían.
@@ -124,7 +110,6 @@ function exportState() {
   let data = {
     globalState: globalState,
     nodes: serializedNodes,
-    paths: serializedPaths,
     clientes: serializedClientes
   };
 
@@ -135,7 +120,7 @@ function exportState() {
   let url = URL.createObjectURL(blob);
   let link = document.createElement("a");
   link.href = url;
-  link.download = "simulationState.json";
+  link.download = "logisticsSim_file.json";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -210,35 +195,7 @@ async function importState(data) {
 
   // 4) Reconstruir paths
   //    Requerimos enlazar cada path con sus nodos A y B (por índice).
-  if (data.paths) {
-    data.paths.forEach((pd) => {
-      let nodeA = nodes[pd.nodeAindex];
-      let nodeB = nodes[pd.nodeBindex];
-      if (!nodeA || !nodeB) return; // Evitar errores
-
-      let p = new Path(nodeA, nodeB);
-      p.activeAtoB = pd.activeAtoB;
-      p.activeBtoA = pd.activeBtoA;
-
-      // Reconstruir los segmentos sin necesidad de llamar a OSRM
-      p.segmentos = pd.segmentos.map((s) => {
-        let seg = new Segment(s.lat1, s.lng1, s.lat2, s.lng2, s.speedKmh);
-        return seg;
-      });
-
-      // Redibujar la polyline
-      let latlngs = [];
-      p.segmentos.forEach((seg) => {
-        if (latlngs.length === 0) {
-          latlngs.push([seg.lat1, seg.lng1]);
-        }
-        latlngs.push([seg.lat2, seg.lng2]);
-      });
-      p.polyline.setLatLngs(latlngs);
-
-      paths.push(p);
-    });
-  }
+ 
 
   // 5) Reconstruir clientes
   //    Para enlazar con nodos y tiendas en tiendasAtendiendome,
@@ -291,8 +248,8 @@ async function importState(data) {
   });
 
   // 7) Forzar un redibujado y actualizar paneles de control
-  nodeLayer.addNodes(nodes);
-  clienteLayer.addClientes(clientes);
+  nodeLayer.draw();
+  clienteLayer.draw();
   actualizaPanelControl();
 
   console.log("Estado importado correctamente.");

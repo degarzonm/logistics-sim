@@ -72,12 +72,14 @@ html, body {
   position: absolute;
   top: 0;
   left: 0;
-  pointer-events: none; /* Permitir interactuar con el mapa debajo */
+  z-index: 1000; 
+  pointer-events: auto; /* Permitir interactuar con el mapa debajo */
 }
 .clientes-layer {
   position: absolute;
   top: 0;
   left: 0;
+  z-index: 1000;  
   pointer-events: none; /* Permitir interactuar con el mapa debajo */
 }
 
@@ -86,6 +88,6 @@ html, body {
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 1000; /* Superior a particle-layer */
+  z-index: 1000;  
   pointer-events: auto; /* Permitir interacciones */
 }

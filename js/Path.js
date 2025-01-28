@@ -83,24 +83,13 @@ class Path {
     this.segmentos = [];
     this.view = new PathView(this);
 
-    this.fetchRouteAndBuildsegmentos();
+    //this.fetchRouteAndBuildsegmentos();
   }
 
   updatePath() {
     this.segmentos = [];
     this.fetchRouteAndBuildsegmentos();
   }
-
-  // se elimina este metodo ya que la clase Vehiculos es ahora la encargada de enviar vehiculos
-  /*send(senderNode, resourceType) {
-        if (senderNode === this.nodeA && this.activeAtoB) {
-            particles.push(new Vehiculo(this, Date.now(), resourceType, "AB"));
-        } else if (senderNode === this.nodeB && this.activeBtoA) {
-            particles.push(new Vehiculo(this, Date.now(), resourceType, "BA"));
-        }
-    }*/
-
-  // la remocion de paths debe hacerse desde los nodos
 
   async fetchRouteAndBuildsegmentos() {
     let fromLat = this.coordsA.lat;
@@ -123,11 +112,11 @@ class Path {
         this.view.updatePolyline(listaCoordsLatLng);
         this.buildsegmentos(listaCoordsLatLng);
       } else {
-        this.createStraightSegment();
+        this.creaSegmentoRecto();
       }
     } catch (err) {
       console.error("Error fetchRouteAndBuildsegmentos:", err);
-      this.createStraightSegment();
+      this.creaSegmentoRecto();
     }
   }
 
@@ -141,7 +130,7 @@ class Path {
     }
   }
 
-  createStraightSegment() {
+  creaSegmentoRecto() {
     let s = new Segment(
       this.nodeA.lat,
       this.nodeA.lng,
@@ -165,8 +154,7 @@ function crearCaminosNodosSeleccionados() {
       let nB = sel[i];
       let coordsB = { lat: nB.lat, lng: nB.lng };
       if (!existeCamino(nA, nB)) {
-        //let newPath = new Path(nA, nB);
-
+        
         //agrega referencias en cada nodo indicando que tiene un camino en comun
         nA.agregaRuta(nB);
         nB.agregaRuta(nA);

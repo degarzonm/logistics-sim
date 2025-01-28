@@ -37,8 +37,6 @@ class Node {
     this.productionInterval = 2000;
 
     this.inventory = {};
-    this.nodosConectados = [];
-    this.paths = [];
     // en mejora a rutas : {ruta, nodo, activa}
     this.rutas = [];
     this.flota = [];
@@ -72,11 +70,15 @@ class Node {
       );
 
       this.flota = [];
+      //remueve flota de vehículos global
+      mundo.vehiculos = mundo.vehiculos.filter((v) => v.nodoActual !== this);
       //agrega 5 motos a la flota
       for (let i = 0; i < 5; i++) {
-        let moto = new Vehiculo();
+        let moto = new Vehiculo("moto");
+        moto.nodoActual = this;
+        moto.enMapa = false;
         this.flota.push(moto);
-        flotaGlobal.push(moto);
+        mundo.vehiculos.push(moto);
       }
     }
     this.rutas.forEach((r) => {
@@ -84,9 +86,9 @@ class Node {
     });
   }
 
-  agregaRuta( nodo) {
+  async agregaRuta( nodo) {
     let nuevaRuta = new Path({lat: this.lat,lng: this.lng}, {lat: nodo.lat,lng: nodo.lng});
-      
+    await nuevaRuta.fetchRouteAndBuildsegmentos();
     paths.push(nuevaRuta);
 
     this.rutas.push({ ruta: nuevaRuta,nodo: nodo, activa: allowedConnections[this.type].includes(nodo.type) });
@@ -105,6 +107,123 @@ class Node {
     // Remove the path from the map
     ruta.ruta.view.removeFromMap();
   }
+
+/**
+   * Expulsa todos los vehículos de la flota y los posiciona
+   * alrededor del nodo, habilitándolos en el mapa.
+   */
+  expulsarFlota() {
+    console.log("Expulsando flota de", this);
+    // definimos un radio alrededor del nodo, en metros
+    let radio = 30; // 10m de distancia
+    let angleStep = (2 * Math.PI) / (this.flota.length + 1);
+    this.flota.forEach((veh, i) => {
+      // calculamos offset en lat/lng
+      let angle = angleStep * i;
+      let offsetLat = (radio * Math.cos(angle)) / 111111;
+      let offsetLng =
+        (radio * Math.sin(angle)) /
+        (111111 * Math.cos(this.lat * (Math.PI / 180)));
+
+      veh.lat = this.lat + offsetLat;
+      veh.lng = this.lng + offsetLng;
+      veh.enMapa = true;
+      veh.nodoActual = null;
+      veh.selected = false;
+    });
+    this.flota = [];
+  }
+
+  /**
+   * Despacha un vehículo hacia otro nodo, cargando 'cargaObj' si cabe.
+   * 'cargaObj' es un objeto {A:5, B:2...}
+   * Retorna una promesa que se completa cuando se inicia el viaje.
+   */
+  despacharVehiculo(veh, nodoDestino, cargaObj) {
+    return new Promise((resolve, reject) => {
+      // 1) Verificamos si el vehículo está en la flota actual (es estacionado aquí)
+      let idx = this.flota.indexOf(veh);
+      if (idx < 0) {
+        return reject("El vehículo no está estacionado en este nodo.");
+      }
+
+      // 2) Verificar que el 'cargaObj' exista en inventario
+      let totalCargar = 0;
+      for (let tipo in cargaObj) {
+        if (!this.inventory[tipo] || this.inventory[tipo] < cargaObj[tipo]) {
+          return reject("No hay suficiente inventario en el nodo.");
+        }
+        totalCargar += cargaObj[tipo];
+      }
+
+      // 3) Ver si cabe en el vehículo
+      if (!veh.cargaCabe(cargaObj)) {
+        return reject("No cabe la carga en el vehículo.");
+      }
+
+      // 4) Iniciar tiempo de carga
+      let tCargaMs = veh.cargar(cargaObj); 
+      // “cargar()” ya sumó la carga en veh.carga => restar al inventario del nodo:
+      for (let t in cargaObj) {
+        this.inventory[t] -= cargaObj[t];
+        if (this.inventory[t] <= 0) {
+          delete this.inventory[t];
+        }
+      }
+      veh.cargando = true;
+      veh.tiempoCargaRestante = tCargaMs;
+
+      // 5) Esperamos (tCargaMs) en un setTimeout simulado, luego sacamos al vehículo al mapa
+      setTimeout(() => {
+        veh.cargando = false;
+        veh.tiempoCargaRestante = 0;
+
+        // 6) Crear el Path desde la pos del nodo (lat,lng) hasta nodoDestino
+        let coordsInicio = { lat: this.lat, lng: this.lng };
+        let coordsFin = { lat: nodoDestino.lat, lng: nodoDestino.lng };
+        let newPath = new Path(coordsInicio, coordsFin);
+
+        // Eliminamos el veh de la flota del nodo
+        this.flota.splice(idx, 1);
+
+        // Asignar un callback para cuando el path esté listo
+        let oldFetch = newPath.fetchRouteAndBuildsegmentos;
+        newPath.fetchRouteAndBuildsegmentos = async function() {
+          await oldFetch.apply(this, arguments);
+
+          // El vehículo pasa al mapa
+          veh.lat = coordsInicio.lat;
+          veh.lng = coordsInicio.lng;
+          veh.enMapa = true;
+          veh.nodoActual = null;
+          veh.path = null; // se asigna luego
+          veh.asignarRuta(newPath);
+        };
+        newPath.fetchRouteAndBuildsegmentos();
+
+        // 7) Lógica de llegada: en drawLoop (o en un observer) 
+        // detectamos si veh.rutaCompletada, entonces:
+        //   - se descarga en 'nodoDestino'
+        //   - se crea un path de retorno
+        //   - al terminar retorna, se "estaciona" en 'this' de nuevo (opcional) 
+        //   o se estaciona en 'nodoDestino' si lo deseas. 
+        //   Podrías personalizarlo.
+
+        resolve("Despacho iniciado");
+      }, tCargaMs); 
+      // un setTimeout con tCargaMs, aunque en un loop continuo 
+      // podría ser un control distinto. 
+    });
+  }
+
+  // Añadir inventario ej: {A:2,B:3} al nodo
+  almacena(inventario) {
+    for (let tipo in inventario) {
+      this.inventory[tipo] = (this.inventory[tipo] || 0) + inventario[tipo];
+    }
+  }
+
+
 
   // Añadir recurso al inventario
   addResource(resourceType) {
@@ -388,5 +507,4 @@ function getNodeColor(node) {
       return "gray";
   }
 }
-
-function despacharVehiculo() {}
+ 

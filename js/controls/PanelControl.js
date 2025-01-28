@@ -28,10 +28,10 @@ function actualizaPanelControl() {
         // Si el nodo cambió de tipo, reconstruye su contenido
         if (nd.type !== nd._lastType) {
           // Vacía y vuelve a crear
-          panelEl.innerHTML = "";
-          buildPanelContent(panelEl, nd);
           nd._lastType = nd.type;
         }
+        panelEl.innerHTML = "";
+        buildPanelContent(panelEl, nd);
         // Caso contrario, mantenemos el contenido (no perdemos foco).
       }
 
@@ -50,7 +50,7 @@ function actualizaPanelControl() {
   });
 }
 
-// buildPanelContent() es simplemente la lógica que tenías en creaControlesNodo()
+// buildPanelContent: función para construir el contenido del panel de control
 function buildPanelContent(panelEl, node) {
   // Título
   const title = document.createElement("h4");
@@ -69,7 +69,94 @@ function estaEnPantalla(nodo) {
 
 function creaControlesNodo(node) {
   const container = document.createElement("div");
+  // Botón para expulsar flota (si existe flota)
+  if (node.flota && node.flota.length > 0) {
+    let btnExpulsar = document.createElement("button");
+    btnExpulsar.innerText = "Expulsar Flota";
+    btnExpulsar.onclick = () => {
+      node.expulsarFlota();
+      actualizaPanelControl();
+    };
+    container.appendChild(btnExpulsar);
+  }
 
+  // Selección y envío de vehículo (solo si hay flota)
+  if (node.flota && node.flota.length > 0) {
+    // 1) Selecciona uno de la flota
+    let labelVeh = document.createElement("label");
+    labelVeh.textContent = "Vehículo:";
+    let selectVeh = document.createElement("select");
+    node.flota.forEach((v, i) => {
+      let opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = `${v.tipo} ${v._id}`;
+      selectVeh.appendChild(opt);
+    });
+    labelVeh.appendChild(selectVeh);
+    container.appendChild(labelVeh);
+
+    // 2) Input para la carga {A: X, B: Y...} (simplificado)
+    // Podrías hacer varios inputs, aquí se hará uno genérico tipo "A=2,B=5" 
+    let labelCarga = document.createElement("label");
+    labelCarga.textContent = "Carga (A=2,B=1):";
+    let inputCarga = document.createElement("input");
+    inputCarga.type = "text";
+    labelCarga.appendChild(inputCarga);
+    container.appendChild(labelCarga);
+
+    // 3) Seleccionar nodo destino
+    let labelDestino = document.createElement("label");
+    labelDestino.textContent = "Destino:";
+    let selectDestino = document.createElement("select");
+    node.rutas.forEach((r, idx) => {
+      
+        let opt = document.createElement("option");
+        opt.value = r.nodo._id;
+        opt.textContent = `${r.nodo.type} #${r.nodo._id}`;
+        selectDestino.appendChild(opt);
+      
+    });
+    labelDestino.appendChild(selectDestino);
+    container.appendChild(labelDestino);
+
+    // 4) Botón "Despachar"
+    let btnDesp = document.createElement("button");
+    btnDesp.innerText = "Despachar Vehículo";
+    btnDesp.onclick = () => {
+      let vehIndex = parseInt(selectVeh.value);
+      let veh = node.flota[vehIndex];
+      if (!veh) return;
+
+      // Parsear la carga
+      let raw = inputCarga.value.trim(); 
+      // Ej: "A=2,B=1"
+      let cargaObj = {};
+      if (raw) {
+        let parts = raw.split(",");
+        parts.forEach((p) => {
+          let [k, v] = p.split("=");
+          if (k && v) {
+            cargaObj[k.trim()] = parseInt(v.trim());
+          }
+        });
+      }
+      // Buscar el nodo destino
+      let destId = parseInt(selectDestino.value);
+      let destinoNode = nodes.find((nd) => nd._id === destId);
+      if (!destinoNode) return;
+
+      node.despacharVehiculo(veh, destinoNode, cargaObj)
+        .then((msg) => {
+          console.log(msg);
+          // se inicia la logística, el vehicle se moverá 
+          actualizaPanelControl();
+        })
+        .catch((err) => {
+          console.warn("Error al despachar:", err);
+        });
+    };
+    container.appendChild(btnDesp);
+  }
   // Aquí añadiremos según el tipo de nodo
   switch (node.type) {
     case "fuente":

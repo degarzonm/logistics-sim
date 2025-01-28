@@ -47,12 +47,7 @@ class ClienteLayer extends L.Layer {
     this.canvas.height = e.newSize.y;
     this.draw();
   }
-
-  // Actualizar las partículas a dibujar
-  addClientes(clientes) {
-    this.clientes = clientes;
-    this.draw();
-  }
+ 
 
   // Dibujar todas las partículas en el Canvas
   draw() {
@@ -62,7 +57,7 @@ class ClienteLayer extends L.Layer {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     // Dibujar las partículas
-    this.clientes.forEach((cliente) => {
+    clientes.forEach((cliente) => {
       if (cliente.atendido) return;
       let point = this.map.latLngToContainerPoint([cliente.lat, cliente.lng]);
       this.ctx.beginPath();

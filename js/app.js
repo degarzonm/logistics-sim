@@ -4,11 +4,15 @@
 //Game variables
 let mundo = {
   tema: {
-    tema_mapa: "dark_all",
+    tema_mapa: "dark_nolabels",
     color_vehiculos: "#FCD144",
     color_caminos: "#FFFFFF",
+    color_texto: "#cccccc",
   },
-  mapa: { centro: [4.626907913301086, -74.1755128361618], zoom: 17 },
+  mapa: {
+    centro: { lat: 4.626907913301086, lng: -74.1755128361618 },
+    zoom: 17,
+  },
   vehiculos: [],
   factorVentaFuente: 0.7,
 };
@@ -26,6 +30,7 @@ let team_color = "#3fb0c4";
 let map; // Instancia Leaflet
 let nodes = [];
 let flotaGlobal = [];
+let vehiculoSeleccionado = null;
 let paths = [];
 //let particles = []; // en proceso de actualizar vehiculos en vez de partículas
 let clientes = [];
@@ -79,12 +84,15 @@ window.addEventListener("load", () => {
   tiposRecurso = {
     A: new Recurso("A", 5, 1, "#aa0000"),
     B: new Recurso("B", 15, 1.5, "#00aa00"),
-    C: new Recurso("C", 25, 2, "#0000aa"),
+    C: new Recurso("C", 25, 2, "#1212aa"),
     D: new Recurso("D", 50, 3, "#aaaa00"),
     E: new Recurso("E", 100, 4, "#00aaaa"),
   };
   // Inicializar el mapa
-  map = L.map("map").setView(mundo.mapa.centro, mundo.mapa.zoom);
+  map = L.map("map").setView(
+    [mundo.mapa.centro.lat, mundo.mapa.centro.lng],
+    mundo.mapa.zoom
+  );
   estilo =
     "https://{s}.basemaps.cartocdn.com/rastertiles/" +
     mundo.tema.tema_mapa +
@@ -95,6 +103,13 @@ window.addEventListener("load", () => {
   }).addTo(map);
 
   // Crear la capa de vehiculos y añadirla al mapa
+  // crea mundo.vehiculos y añade una moto al jugador
+  let motoInicial = new Vehiculo("moto");
+  motoInicial.setPos(mundo.mapa.centro);
+  motoInicial.enMapa = true;
+  motoInicial.carga = { A: 5, B: 5, C: 5, D: 5, E: 5 };
+  mundo.vehiculos.push(motoInicial);
+
   vehiculosLayer = new VehiculoLayer();
   map.addLayer(vehiculosLayer);
 
@@ -105,13 +120,6 @@ window.addEventListener("load", () => {
   // Crear la capa de clientes y añadirla al mapa
   clienteLayer = new ClienteLayer();
   map.addLayer(clienteLayer);
-  // crea mundo.vehiculos y añade una moto al jugador
-  /*let motoInicial = new Vehiculo(
-    "moto",
-    map.getCenter().lat,
-    map.getCenter().lng
-  );
-  mundo.vehiculos.push(motoInicial);*/
 
   // Botones
   createCaminoButton = document.getElementById("createCaminoButton");
@@ -163,18 +171,6 @@ window.addEventListener("load", () => {
   map.on("contextmenu", (e) => {
     crearNodo(e.latlng.lat, e.latlng.lng);
   });
-  //ctrl + click en el mapa => mover moto inicial a la posición del click
-  map.on("click", (e) => {
-    if (e.originalEvent.ctrlKey) {
-      // Si presionamos Ctrl mientras hacemos clic en el mapa,
-      // movemos la moto inicial (o cualquier vehículo que queramos).
-      // Podrías buscar la primera moto de mundo.vehiculos, o un vehículo concreto.
-      if (mundo.vehiculos.length > 0) {
-        let veh = mundo.vehiculos[0]; // Por simplicidad, la primera moto
-        veh.definirRuta(e.latlng.lat, e.latlng.lng);
-      }
-    }
-  });
 
   // Iniciar el loop de dibujo
   requestAnimationFrame(drawLoop);
@@ -189,57 +185,46 @@ window.addEventListener("load", () => {
  * FUNCIÓN PRINCIPAL DE DIBUJO (LOOP)
  ****************************************************/
 function drawLoop() {
+  let dt = Date.now() - now;
   now = Date.now();
   //Actualizar estadisticas globales
   actualizaEstadisticas();
   // Actualizar nodos
   nodes.forEach((n) => n.updateNode());
+
+  //actualiza los vehiculos
+
+  for (let v of mundo.vehiculos) {
+    if (v.enMapa && !v.cargando && v.tiempoCargaRestante <= 0) {
+      v.update(dt);
+      if (v.rutaCompletada) {
+        let finalLat = null, finalLng = null;
+        if (v.ruta && v.ruta.segmentos.length > 0) {
+          let seg = v.ruta.segmentos[v.ruta.segmentos.length - 1];
+          finalLat = seg.lat2;
+          finalLng = seg.lng2;
+        }
+        console.log("Vehículo en destino final", finalLat, finalLng);
+        let foundNode = nodes.find((n) => {
+          let dist = L.latLng(n.lat, n.lng).distanceTo([finalLat, finalLng]);
+          return dist < 30; 
+        });
+        if (foundNode) {
+          // Descargamos
+          foundNode.almacena(v.descargarTodo());
+          
+        }
+        
+        v.finalizaRuta();
+      }
+    }
+  }
+
   // Actualizar clientes
   clientes.forEach((c) => c.updateCliente());
-  // Actualizar posiciones de partículas basadas en el tiempo transcurrido
-
-  /*
-  // en proceso de actualizar vehiculos en vez de partículas
-  particles.forEach((pt) => {
-    let elapsed = currentTime - pt.tInicio;
-
-    pt.actualizaPosicion(elapsed);
-  });*/
-  // ***** Actualizar vehículos GLOBALES
-
-  mundo.vehiculos.forEach((veh) => {
-    veh.actualizarPosicion(now);
-    // Si llegó a destino y tenemos lógica adicional, se manejaría aquí
-  });
-
-  // ***** Recolectar también vehículos de cada nodo y actualizarlos
-  // (Opcional: solo si un nodo puede mover sus vehículos en el mapa)
-  nodes.forEach((node) => {
-    node.flota.forEach((veh) => {
-      veh.actualizarPosicion(now);
-      // Manejar llegada de ruta, descarga, retorno, etc.
-      if (veh.finishedRoute && !veh.enRetorno && veh.destinoNode) {
-        // Ejemplo de descarga
-        let cargamento = veh.descargarTodo();
-        for (let tipo in cargamento) {
-          veh.destinoNode.inventory[tipo] =
-            (veh.destinoNode.inventory[tipo] || 0) + cargamento[tipo];
-        }
-        // Preparar retorno:
-        veh.definirRuta(veh.origenNode.lat, veh.origenNode.lng);
-        veh.enRetorno = true;
-      } else if (veh.finishedRoute && veh.enRetorno) {
-        // El vehículo ya regresó, lo estacionamos
-        // Ejemplo:
-        veh.lat = node.lat;
-        veh.lng = node.lng;
-        // Reseteamos flags
-        veh.enMovimiento = false;
-        veh.enRetorno = false;
-      }
-    });
-  });
-
+  // Dibuja los nodos
+  nodeLayer.draw();
+  clienteLayer.draw();
   // Dibujar todos los vehículos en la capa vehicleLayer
   vehiculosLayer.draw();
 
@@ -263,9 +248,7 @@ function limpiarTodo() {
   paths.forEach((p) => p.view.removeFromMap());
   paths = [];
   nodes = [];
-
-  // ***** Limpiar flota global
-  flotaGlobal = [];
+  mundo.vehiculos = [];
 
   nodeLayer.addNodes(nodes); // Actualizar la capa de nodos
   actualizaPanelControl();
@@ -274,3 +257,4 @@ function limpiarTodo() {
 function mostrarCaminos() {
   mostrarCaminosFlag = !mostrarCaminosFlag;
 }
+  
