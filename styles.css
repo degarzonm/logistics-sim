@@ -1,93 +1,296 @@
 /* Ajustes para ocupar toda la ventana */
 html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  font-family: sans-serif;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: sans-serif;
+  }
+  
+  /* El mapa ocupará todo el fondo */
+  #map {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    background-color: #1a1a1a; /* Fondo oscuro para el mapa */
+  }
+  
+  /* Contenedor de botones, en la esquina superior derecha */
+  #buttons-container {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1001; /* Por encima de las capas del mapa */
+    background-color: rgba(40, 40, 40, 0.85);
+    color: #f0f0f0;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #555;
+  }
+  
+  #buttons-container button {
+    display: block;
+    width: 100%;
+    margin: 8px 0;
+    padding: 8px 12px;
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #666;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  #buttons-container button:hover {
+    background-color: #4a4a4a;
+    border-color: #888;
+  }
+  
+  #buttons-container hr {
+    border: 0;
+    border-top: 1px solid #555;
+    margin: 10px 0;
+  }
+  
+  /* Panel de control para los nodos */
+  #control-panels-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none; /* El contenedor no intercepta clics */
+      z-index: 1002;
+  }
+  
+  .node-control-panel {
+    position: absolute;
+    background-color: rgba(45, 45, 45, 0.95);
+    color: #f0f0f0;
+    box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #666;
+    z-index: 9999;
+    min-width: 150px;
+    pointer-events: auto; /* Los paneles sí interceptan clics */
+    transition: opacity 0.2s ease-in-out;
+  }
+  
+  .node-control-panel h4 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    border-bottom: 1px solid #555;
+    padding-bottom: 6px;
+  }
+  
+  .node-control-panel label {
+    display: block;
+    font-size: 12px;
+    margin: 8px 0 4px;
+  }
+  
+  .node-control-panel input,
+  .node-control-panel select {
+    width: 95%;
+    padding: 4px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 3px;
+  }
+  
+  /* Estadísticas */
+  #estadisticas {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      z-index: 1001;
+      background-color: rgba(40, 40, 40, 0.85);
+      color: #f0f0f0;
+      padding: 5px 15px;
+      border-radius: 5px;
+      border: 1px solid #555;
+  }
+  
+  #estadisticas h3 {
+      margin: 5px 0;
+      font-size: 14px;
+  }
+  #estadisticas p {
+      margin: 5px 0;
+      font-size: 12px;
+  }
+  
+  /* Estilos para las capas Canvas (genérico) */
+  .leaflet-canvas-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none; /* Por defecto no interceptan, se activa en la capa de nodos */
+  }
+  .node-layer {
+      pointer-events: auto !important; /* La capa de nodos necesita interceptar eventos */
+      z-index: 500;
+  }
+  .vehicle-layer { z-index: 600; }
+  .client-layer { z-index: 700; }
+  .effects-layer { z-index: 800; }
+
+  /* Estilo para el panel de vehículo (reutiliza el de nodo) */
+.vehicle-control-panel {
+    position: absolute;
+    background-color: rgba(60, 45, 75, 0.95); /* Color ligeramente diferente */
+    color: #f0f0f0;
+    box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #8e7cc3;
+    z-index: 9998; /* Un poco por debajo del de nodo */
+    min-width: 150px;
+    pointer-events: auto;
+    font-size: 12px;
 }
 
-/* El mapa ocupará todo el fondo */
-#map {
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
+.vehicle-control-panel h4 {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    border-bottom: 1px solid #8e7cc3;
+    padding-bottom: 5px;
 }
 
-/* Contenedor de botones, en la esquina superior derecha */
-#buttons-container {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 999;
-  background-color: rgba(255, 255, 255, 0.8);
-  padding: 10px;
-  border-radius: 5px;
+.vehicle-control-panel p {
+    margin: 4px 0;
 }
 
-#buttons-container button {
-  display: block;
-  margin: 5px 0;
+/* Estilo para el panel de creación de pedidos */
+.pedido-panel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 350px;
+    background-color: #333;
+    color: #f0f0f0;
+    border: 2px solid #777;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.7);
+    z-index: 10000;
+    pointer-events: auto;
 }
 
-/* Panel de control para los nodos */
-
-.node-control-panel {
-  position: absolute;
-  background-color: rgba(255, 255, 255, 0.95);
-  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.2);
-  padding: 10px;
-  border-radius: 8px;
-  z-index: 9999;   /* por encima de otras capas */
-  min-width: 120px;
-  pointer-events: auto; /* para que pueda interactuarse */
-  transition: opacity 0.2s ease-in-out;
+.pedido-panel-header {
+    padding: 10px 15px;
+    border-bottom: 1px solid #555;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.node-control-panel.hidden {
-  display: none;
+.pedido-panel-header h4 {
+    margin: 0;
 }
 
-.node-control-panel h4 {
-  margin: 0 0 6px 0;
-  font-size: 14px;
+.pedido-panel .close-btn {
+    background: none;
+    border: none;
+    color: #f0f0f0;
+    font-size: 24px;
+    cursor: pointer;
 }
 
-.node-control-panel label {
-  display: block;
-  font-size: 12px;
-  margin: 4px 0 2px;
+.pedido-panel-body {
+    padding: 15px;
 }
 
-.node-control-panel input {
-  width: 60px;
-  padding: 2px;
-  margin-bottom: 6px;
-  font-size: 12px;
-  font-family: Calibri, sans-serif;
-}
-/* Estilo para la capa de partículas Canvas */
-.vehiculos-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 1000; 
-  pointer-events: auto; /* Permitir interactuar con el mapa debajo */
-}
-.clientes-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 1000;  
-  pointer-events: none; /* Permitir interactuar con el mapa debajo */
+.pedido-panel .form-group {
+    margin-bottom: 15px;
 }
 
-/* Estilo para la capa de nodos Canvas */
-.node-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 1000;  
-  pointer-events: auto; /* Permitir interacciones */
+.pedido-panel label {
+    display: block;
+    margin-bottom: 5px;
 }
+
+.pedido-panel select, .pedido-panel input {
+    width: 100%;
+    padding: 8px;
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.pedido-panel .items-to-order .item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px;
+    background-color: #444;
+    margin-top: 5px;
+    border-radius: 3px;
+}
+
+.pedido-panel .remove-item-btn {
+    background-color: #c0392b;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.pedido-panel-footer {
+    padding: 10px 15px;
+    border-top: 1px solid #555;
+    text-align: right;
+}
+
+.pedido-panel-footer button {
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid #666;
+}
+
+.pedido-panel-footer .confirm-btn {
+    background-color: #27ae60;
+    color: white;
+    margin-left: 10px;
+}
+
+.pedido-panel-footer .cancel-btn {
+    background-color: #555;
+    color: white;
+}
+
+.node-control-panel .vehicle-list {
+    margin-top: 10px;
+}
+
+.node-control-panel .vehicle-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    padding: 2px 0;
+}
+
+.node-control-panel .expel-button {
+    font-size: 10px;
+    padding: 2px 5px;
+    background-color: #c0392b;
+    border: none;
+    color: white;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+  
